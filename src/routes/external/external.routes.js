@@ -9,6 +9,6 @@ router.get('/google/business/search',externalController.googleBusinessSearch);
 router.get('/google/business/place',externalController.googleBusinessSearchById);
 router.get('/bbb/business/organization',externalController.bbbBusinessSearch);
 // router.get('/twilio/business/organization',externalController.twilio)
-router.get('/google/business/demo',externalController.demo)
+// router.get('/google/business/demo',externalController.demo)
 
 module.exports = router;
