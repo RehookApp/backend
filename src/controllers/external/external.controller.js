@@ -26,21 +26,87 @@ error500 = (message, res) => {
         message: message
     });
 };
+const googleBusinessSearch = async (req, res) => {
+    const businessName = req.query.name;
+    if (!businessName) {
+        return error422("Business name is required.", res)
+    }
+    const base_url = 'https://maps.googleapis.com/maps/api/place/findplacefromtext/json?';
+    // fields: 'name,formatted_address,rating,place_id,photos,type,icon,icon_mask_base_uri,user_ratings_total,business_status,geometry,plus_code,price_level',
+    const params = {
+        input: businessName,
+        inputtype: 'textquery',
+        fields: 'name,formatted_address,rating,place_id,photos,type,icon,icon_mask_base_uri,user_ratings_total,business_status,plus_code,price_level',
+        key: GOOGLE_API_KEY
+    };
+
+    let response = await axios.get(base_url, { params });
+    try {
+        if (response.status === 200) {
+            const data = response.data;
+            res.status(200).json({
+                status: 200,
+                message: "Google business retrived successfully.",
+                data: data.candidates,
+            });
+        }
+    } catch (error) {
+        // console.error('Error:', error);
+        res.status(500).json({ error: error });
+    }
+};
+
+const googleBusinessSearchById = async (req, res) => {
+    const placeId = req.query.placeId;
+    if (!placeId) {
+        return error422("Place ID is required", res)
+    }
+    const base_url = 'https://maps.googleapis.com/maps/api/place/details/json?';
+    const params = {
+        place_id: placeId,
+        fields: 'name,formatted_address,rating,place_id,photos,type,icon,icon_mask_base_uri,user_ratings_total,business_status,geometry,plus_code,price_level,reviews',
+        key: GOOGLE_API_KEY
+    };
+
+    try {
+        const response = await axios.get(base_url, { params });
+        if (response.status === 200) {
+            const data = response.data;
+            if (data.result) {
+                let reviewsList = [];
+                if (data.result.reviews) {
+                    reviewsList = data.result.reviews
+                } else {
+                    reviewsList = []
+                }
+                return res.status(200).json({
+                    status: 200,
+                    message: "Google review retrived successfully.",
+                    data: reviewsList,
+                });
+            } else {
+                return error422("Business not found", res)
+            }
+        } else {
+            return error422("Failed to fetch data", res)
+        }
+    } catch (error) {
+        return error500(error);
+    }
+};
 
 //yelp business search
 const yelpBusinessSearch = async (req, res) => {
     const location = req.query.location;
     if (!location) {
-        return res.status(422).json({
-            status: 200,
-            message: "Location is required."
-        });
+        return error422("Location is required.", res);
     }
 
     try {
         sdk.auth(`Bearer ${YELP_TOKEN}`);
         sdk.v3_business_search({ location: location, sort_by: 'best_match', limit: '21' })
-            .then(({ data }) => res.status(200).json(data)
+            .then(({ data }) => 
+                res.status(200).json(data)
                 // if (data) {
                 //     res.status(200).json({
                 //         status:200,
@@ -67,10 +133,12 @@ const yelpBusinessSearchByPhone = async (req, res) => {
 
     try {
         sdk.auth(`Bearer ${YELP_TOKEN}`);
-        sdk.v3_business_phone_search({ phone: `${phone}` })
-            .then(({ data }) =>
-                res.status(200).json(data))
-            .catch(err => res.status(422).json({ error: err }));
+       let result= await sdk.v3_business_phone_search({ phone: `${phone}` })
+       return res.status(200).json(result)
+
+            // .then(({ data }) =>
+            //     res.status(200).json(data))
+            // .catch(err => res.status(422).json({ error: err }));
     } catch (error) {
         return error500(error, res);
     }
@@ -92,76 +160,6 @@ const yelpBusinessSearchByBusinessId = async (req, res) => {
     }
 };
 
-const googleBusinessSearch = async (req, res) => {
-
-    const businessName = req.query.name;
-    if (businessName) {
-        const base_url = 'https://maps.googleapis.com/maps/api/place/findplacefromtext/json?';
-        // fields: 'name,formatted_address,rating,place_id,photos,type,icon,icon_mask_base_uri,user_ratings_total,business_status,geometry,plus_code,price_level',
-        const params = {
-            input: businessName,
-            inputtype: 'textquery',
-            fields: 'name,formatted_address,rating,place_id,photos,type,icon,icon_mask_base_uri,user_ratings_total,business_status,plus_code,price_level',
-            key: GOOGLE_API_KEY
-        };
-
-        let response = await axios.get(base_url, { params });
-
-        try {
-
-            // if (response.status === 200) {
-            const data = response.data;
-
-            res.status(200).json({
-                status: 200,
-                res: data.candidates,
-            });
-            // }
-        } catch (error) {
-            // console.error('Error:', error);
-            res.status(500).json({ error: error });
-        }
-    } else {
-        res.json({ error: 'Invalid input' });
-    }
-};
-
-const googleBusinessSearchById = async (req, res) => {
-    const placeId = req.query.placeId;
-
-    if (placeId) {
-        const base_url = 'https://maps.googleapis.com/maps/api/place/details/json?';
-        const params = {
-            place_id: placeId,
-            fields: 'name,formatted_address,rating,place_id,photos,type,icon,icon_mask_base_uri,user_ratings_total,business_status,geometry,plus_code,price_level,reviews',
-            key: GOOGLE_API_KEY
-        };
-
-        try {
-            const response = await axios.get(base_url, { params });
-
-            if (response.status === 200) {
-                const data = response.data;
-                if (data.result) {
-                    const businessData = data.result;
-                    res.status(200).json({
-                        status: 200,
-                        res: data.result,
-                    });
-                } else {
-                    res.json({ error: 'Business not found' });
-                }
-            } else {
-                res.status(500).json({ error: 'Failed to fetch data' });
-            }
-        } catch (error) {
-            res.status(500).json({ error: error.message });
-        }
-    } else {
-        res.json({ error: 'Invalid place id' });
-    }
-};
-
 const bbbBusinessSearch = async (req, res) => {
     const organizationName = req.query.organizationName;
     const businessId = req.query.businessId;
@@ -175,6 +173,7 @@ const bbbBusinessSearch = async (req, res) => {
         if (organizationName) {
             params = {
                 organizationName: organizationName,
+
             };
         } else if (businessId) {
             params = {
@@ -208,5 +207,5 @@ module.exports = {
     googleBusinessSearchById,
     bbbBusinessSearch,
     yelpBusinessSearchByBusinessId,
-    
+
 }
